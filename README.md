@@ -1,13 +1,8 @@
-# Тестовое задание для стажера по направлению *Разработчик C/C++*
-## https://github.com/Ksenia-rgb/infotecs-traineeship-developer-c-cxx
-Задание основано на аналогичном проекте: https://github.com/Ksenia-rgb/infotecs-traineeship-developer-cxx
+# Разработка библиотеки для логирования и консольного приложения для демонстрации ее работы
 
-Основные отличия:
-- Система сборки проекта: Makefile вместо cmake
+`tecslog` - разработанная библиотека для записи сообщений в журнал с разными уровнями важности;
 
-`tecslog` - разработанная в ходе выполнения задания библиотека для записи сообщений в журнал с разными уровнями важности.
-
-`demo-app` - приложение для проверки работы библиотеки
+`demo-app` - приложение для проверки работы библиотеки.
 ## Структура папок
 - `tecslog` - папка, содержащая файлы библиотеки
   - `include` - заголовочные файлы библиотеки для подключения
@@ -145,11 +140,11 @@ make run ARGS="logs/monday.log INFO"
 `help`
 
 
-Признаком конца пользовательского ввода является EOF (на Linux: Ctrl + D | на Windows Ctrl + Z затем Enter).
+Признаком конца пользовательского ввода является EOF (на Linux: Ctrl + D | на Windows Ctrl + Z, затем Enter).
 
 ### Пример использования приложения
 ```c++
-./bin/demo-app ../logs/monday.log WARNING
+> make run ARGS="logs/monday.log WARNING"
 log "check message" WARNING
 log "info message" INFO
 default INFO
@@ -157,7 +152,7 @@ log "info message again" INFO
 silence ERROR
 log error
 ```
-Файл `../logs/monday.log`:
+Файл `logs/monday.log`:
 ```
 11.08.2026 16:35:56 [WARNING] check message
 11.08.2026 16:36:44 [INFO] info message again
