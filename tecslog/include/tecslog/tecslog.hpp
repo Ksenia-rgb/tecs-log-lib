@@ -16,7 +16,7 @@ namespace tecslog
   std::error_code setLevel(const std::string& level);
   std::ostream& printPossibleLevels(std::ostream& out);
   std::optional< Level > parseLevel(const std::string& str_level);
-  Level getDefaultLevel();
+  Level getLevel();
   std::string getLogFile();
   void reset();
 

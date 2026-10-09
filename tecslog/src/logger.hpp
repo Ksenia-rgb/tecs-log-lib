@@ -1,26 +1,64 @@
 #ifndef LOGGER_HPP
 #define LOGGER_HPP
 
+#include <deque>
 #include <fstream>
-#include <mutex>
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include <atomic>
+#include <condition_variable>
+#include <mutex>
+#include <thread>
 
 #include <tecslog/types.hpp>
 
 namespace tecslog
 {
+  namespace detail
+  {
+    extern const std::string default_filename_;
+    extern const Level default_level_;
+    extern const std::unordered_map< tecslog::Level, std::string > level_map;
+    extern const std::unordered_map< std::string, tecslog::Level > str_level_map;
+
+    class LogWriter
+    {
+    public:
+      explicit LogWriter(const std::string& filename);
+      ~LogWriter();
+
+      std::error_code setFile(const std::string& filename);
+      std::string getFile();
+      std::error_code push(std::string message);
+      void reset();
+    private:
+      std::deque< std::string > log_queue_;
+      std::mutex mutex_queue_;
+      std::condition_variable cond_;
+
+      std::string config_filename_;
+      std::string open_filename_;
+      std::ofstream out_;
+      std::mutex mutex_file_;
+      std::error_code file_state_;
+
+      std::atomic< bool > stopped_;
+      std::thread writer_;
+
+      void tryFileOpen();
+      void write();
+    };
+  }
   class Logger
   {
   public:
     static Logger& instance();
 
     std::error_code setFile(const std::string& filename);
-    bool isFileOpen();
     std::error_code setLevel(Level level);
     std::error_code setLevel(const std::string& str_level);
-    Level getDefaultLevel();
+    Level getLevel();
     std::string getLogFile();
     void reset();
 
@@ -33,26 +71,14 @@ namespace tecslog
     static std::string levelToStr(Level level);
     static std::optional< Level > strToLevel(const std::string& level);
   private:
-    static const std::string default_filename_;
-    static const Level default_level_;
-    static const std::unordered_map< tecslog::Level, std::string > level_map;
-    static const std::unordered_map< std::string, tecslog::Level > str_level_map;
-
-    std::string config_filename_;
-    std::string open_filename_;
-    Level level_;
-    std::ofstream out_;
-
-    std::mutex mutex_level;
-    std::mutex mutex_file;
+    detail::LogWriter writer_;
+    std::atomic< Level > level_;
 
     Logger();
-    ~Logger();
     Logger(const Logger&) = delete;
     Logger& operator=(const Logger&) = delete;
 
-    std::error_code uncheckLevelLog(const std::string& str_level, const std::string& message);
-    std::error_code ensureFileOpen();
+    std::error_code sendLog(const std::string& str_level, const std::string& message);
   };
 }
 

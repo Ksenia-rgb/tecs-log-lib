@@ -11,7 +11,7 @@ TEST_CASE(TecslogСorrectInitTest)
 
   std::error_code code = tecslog::init(filename, tecslog::Level::WARNING);
   bool file = tecslog::getLogFile() == filename;
-  bool level = tecslog::getDefaultLevel() == tecslog::Level::WARNING;
+  bool level = tecslog::getLevel() == tecslog::Level::WARNING;
 
   return code.value() == 0 && file && level;
 }
@@ -25,7 +25,7 @@ TEST_CASE(TecslogCorrectInitWithStrLevelTest)
 
   std::error_code code = tecslog::init(filename, "INFO");
   bool file = tecslog::getLogFile() == filename;
-  bool level = tecslog::getDefaultLevel() == tecslog::Level::INFO;
+  bool level = tecslog::getLevel() == tecslog::Level::INFO;
 
   return code.value() == 0 && file && level;
 }
@@ -39,7 +39,7 @@ TEST_CASE(TecslogIncorrectInitWithStrLevelTest)
 
   std::error_code code = tecslog::init(filename, "INCORRECT");
   bool file = tecslog::getLogFile() == filename;
-  bool level = tecslog::getDefaultLevel() == tecslog::Level::INFO;
+  bool level = tecslog::getLevel() == tecslog::Level::INFO;
 
   return code.value() != 0 && file && level;
 }
