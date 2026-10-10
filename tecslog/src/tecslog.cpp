@@ -63,6 +63,16 @@ std::string tecslog::getLogFile()
   return logger.getLogFile();
 }
 
+tecslog::Level tecslog::getDefaultLevel()
+{
+  return default_level;
+}
+
+std::string tecslog::getDefaultLogFile()
+{
+  return default_filename;
+}
+
 void tecslog::reset()
 {
   Logger& logger = Logger::instance();

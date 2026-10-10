@@ -55,7 +55,7 @@ TEST_CASE(TecslogIncorrectSetStrLevelTest)
 
   tecslog::init(filename, "WARNING");
   std::error_code code = tecslog::setLevel("INCORRECT");
-  bool level = tecslog::getLevel() == tecslog::Level::WARNING;
+  bool level = tecslog::getLevel() == tecslog::default_level;
 
   return code.value() != 0 && level;
 }

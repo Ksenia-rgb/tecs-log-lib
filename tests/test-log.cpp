@@ -33,9 +33,7 @@ TEST_CASE(TecslogErrorWithIncorrectFileTest)
   tecslog::reset();
 
   std::string filename_unreal = "logs/unreal-directory/test.log";
-  std::string filename_default = tecslog::getLogFile();
-  test::TestFileGuard guard_unreal(filename_unreal);
-  test::TestFileGuard guard(filename_default);
+  std::string filename_default = tecslog::getDefaultLogFile();
 
   std::error_code code_init = tecslog::init(filename_unreal, tecslog::Level::WARNING);
   std::error_code code = tecslog::error("Error mess");
@@ -44,7 +42,7 @@ TEST_CASE(TecslogErrorWithIncorrectFileTest)
   std::ostringstream sout;
   sout << file.rdbuf();
 
-  return code_init.value() != 0 && code.value() == 0 && sout.str().find("[ERROR] Error mess") != std::string::npos;
+  return code_init.value() != 0 && code.value() != 0 && sout.str().find("[ERROR] Error mess") != std::string::npos;
 }
 
 TEST_CASE(TecslogInfoWarningErrorWithLowerDefaultLevelTest)

@@ -10,7 +10,10 @@
 
 namespace
 {
-  std::string str_now_time()
+  std::string strNowTime();
+  std::string strToUpper(const std::string& str);
+
+  std::string strNowTime()
   {
     auto now = std::chrono::system_clock::now();
     std::time_t now_c = std::chrono::system_clock::to_time_t(now);
@@ -26,7 +29,7 @@ namespace
     oss << std::put_time(&tm, "%d.%m.%Y %H:%M:%S");
     return oss.str();
   }
-  std::string strToupper(const std::string& str)
+  std::string strToUpper(const std::string& str)
   {
     std::string upper;
     std::transform(str.begin(), str.end(), std::back_inserter(upper),
@@ -36,24 +39,12 @@ namespace
   }
 }
 
-const std::string tecslog::detail::default_filename_ = "tecslog.log";
-const tecslog::Level tecslog::detail::default_level_ = tecslog::Level::MIN;
-const std::unordered_map< tecslog::Level, std::string > tecslog::detail::level_map = {
-  {tecslog::Level::INFO, "INFO"},
-  {tecslog::Level::WARNING, "WARNING"},
-  {tecslog::Level::ERROR, "ERROR"}
-};
-const std::unordered_map< std::string, tecslog::Level > tecslog::detail::str_level_map = {
-  {"INFO", tecslog::Level::INFO},
-  {"WARNING", tecslog::Level::WARNING},
-  {"ERROR", tecslog::Level::ERROR}
-};
-
 tecslog::detail::LogWriter::LogWriter(const std::string& filename):
-  stopped_(false),
-  writer_(std::thread(&LogWriter::write, this))
+  out_default_(default_filename),
+  stopped_(false)
 {
   setFile(filename);
+  writer_ = std::thread(&LogWriter::write, this);
 }
 
 tecslog::detail::LogWriter::~LogWriter()
@@ -65,19 +56,13 @@ tecslog::detail::LogWriter::~LogWriter()
   {
     writer_.join();
   }
-  if (out_.is_open())
-  {
-    out_.flush();
-    out_.close();
-  }
+  closeFiles();
 }
 
 std::error_code tecslog::detail::LogWriter::setFile(const std::string& filename)
 {
-  {
-    std::lock_guard< std::mutex > lock(mutex_file_);
-    config_filename_ = filename;
-  }
+  std::lock_guard< std::mutex > lock(mutex_file_);
+  filename_ = filename;
   tryFileOpen();
   return file_state_;
 }
@@ -85,7 +70,7 @@ std::error_code tecslog::detail::LogWriter::setFile(const std::string& filename)
 std::string tecslog::detail::LogWriter::getFile()
 {
   std::lock_guard< std::mutex > lock(mutex_file_);
-  return config_filename_;
+  return filename_;
 }
 
 std::error_code tecslog::detail::LogWriter::push(std::string message)
@@ -95,40 +80,18 @@ std::error_code tecslog::detail::LogWriter::push(std::string message)
     log_queue_.push_back(std::move(message));
   }
   cond_.notify_one();
+
+  std::lock_guard< std::mutex > lock(mutex_file_);
   return file_state_;
 }
 
 void tecslog::detail::LogWriter::reset()
 {
   std::lock_guard< std::mutex > lock(mutex_file_);
-  config_filename_ = default_filename_;
-  open_filename_ = "";
-  if (out_.is_open())
-  {
-    out_.flush();
-    out_.close();
-  }
-}
-
-void tecslog::detail::LogWriter::tryFileOpen()
-{
-  std::lock_guard< std::mutex > lock(mutex_file_);
-  if (out_.is_open() && config_filename_ == open_filename_)
-  {
-    file_state_ = {};
-    return;
-  }
-  if (!out_.is_open() && config_filename_ == open_filename_)
-  {
-    file_state_ = std::make_error_code(std::errc::no_such_file_or_directory);
-    return;
-  }
-  out_.close();
-  out_.open(config_filename_, std::ios::app);
-  open_filename_ = config_filename_;
-  file_state_ = !out_.is_open() ? std::make_error_code(std::errc::no_such_file_or_directory) : std::error_code{};
-
-  return;
+  closeFiles();
+  out_default_.open(default_filename);
+  filename_ = default_filename;
+  file_state_ = {};
 }
 
 void tecslog::detail::LogWriter::write()
@@ -139,35 +102,75 @@ void tecslog::detail::LogWriter::write()
     cond_.wait(lock, [this]{ return stopped_.load() || !log_queue_.empty(); });
     if (log_queue_.empty())
     {
-      out_.flush();
       break;
     }
 
     std::deque< std::string > copy = std::move(log_queue_);
     lock.unlock();
 
-    tryFileOpen();
-    if (!file_state_)
-    {
-      std::copy(
-        copy.begin(),
-        copy.end(),
-        std::ostream_iterator< std::string >(out_, "\n")
-      );
-    }
+    std::lock_guard< std::mutex > lock_file(mutex_file_);
+    std::ostream* fout = chooseOut();
+    std::copy(
+      copy.begin(),
+      copy.end(),
+      std::ostream_iterator< std::string >(*fout, "\n")
+    );
+    fout->flush();
   }
 
+  std::lock_guard< std::mutex > lock_file(mutex_file_);
+  std::ostream* fout = chooseOut();
   std::copy(
     log_queue_.begin(),
     log_queue_.end(),
-    std::ostream_iterator< std::string >(out_, "\n")
+    std::ostream_iterator< std::string >(*fout, "\n")
   );
-  out_.flush();
+  fout->flush();
+}
+
+void tecslog::detail::LogWriter::tryFileOpen()
+{
+  if (out_.is_open() && filename_ != default_filename)
+  {
+    out_.flush();
+    out_.close();
+  }
+  if (filename_ == default_filename)
+  {
+    file_state_ = {};
+    return;
+  }
+  out_.open(filename_, std::ios::app);
+  file_state_ = !out_.is_open() ? std::make_error_code(std::errc::no_such_file_or_directory) : std::error_code{};
+  return;
+}
+
+std::ofstream* tecslog::detail::LogWriter::chooseOut()
+{
+  if (file_state_ || filename_ == default_filename)
+  {
+    return &out_default_;
+  }
+  return &out_;
+}
+
+void tecslog::detail::LogWriter::closeFiles()
+{
+  if (out_.is_open())
+  {
+    out_.flush();
+    out_.close();
+  }
+  if (out_default_.is_open())
+  {
+    out_default_.flush();
+    out_default_.close();
+  }
 }
 
 tecslog::Logger::Logger():
-  writer_(detail::default_filename_),
-  level_(detail::default_level_)
+  writer_(default_filename),
+  level_(default_level)
 {}
 
 tecslog::Logger& tecslog::Logger::instance()
@@ -197,6 +200,7 @@ std::error_code tecslog::Logger::setLevel(const std::string& str_level)
   {
     return setLevel(level.value());
   }
+  setLevel(default_level);
   return std::make_error_code(std::errc::invalid_argument);
 }
 
@@ -213,7 +217,7 @@ std::string tecslog::Logger::getLogFile()
 void tecslog::Logger::reset()
 {
   writer_.reset();
-  level_.store(detail::default_level_);
+  level_.store(default_level);
 }
 
 std::error_code tecslog::Logger::info(const std::string& message)
@@ -257,23 +261,24 @@ std::error_code tecslog::Logger::log(const std::string& str_level, const std::st
 
 std::error_code tecslog::Logger::sendLog(const std::string& str_level, const std::string& message)
 {
-  std::string formatted = str_now_time() + " [" + str_level + "] " + message;
+  std::string formatted = strNowTime() + " [" + str_level + "] " + message;
   return writer_.push(std::move(formatted));
 }
 
 std::string tecslog::Logger::levelToStr(Level level)
 {
-  return detail::level_map.find(level)->second;
+  return str_level[level];
 }
 
 std::optional< tecslog::Level > tecslog::Logger::strToLevel(const std::string& level)
 {
-  std::string level_up = strToupper(level);
+  std::string level_up = strToUpper(level);
 
-  auto level_iter = detail::str_level_map.find(level_up);
-  if (level_iter != detail::str_level_map.end())
+  auto level_iter = std::find(str_level.begin(), str_level.end(), level_up);
+  if (level_iter != str_level.end())
   {
-    return level_iter->second;
+    size_t index = std::distance(str_level.begin(), level_iter);
+    return static_cast< Level >(index);
   }
   return {};
 }

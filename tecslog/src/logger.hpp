@@ -5,7 +5,6 @@
 #include <fstream>
 #include <optional>
 #include <string>
-#include <unordered_map>
 #include <atomic>
 #include <condition_variable>
 #include <mutex>
@@ -17,11 +16,6 @@ namespace tecslog
 {
   namespace detail
   {
-    extern const std::string default_filename_;
-    extern const Level default_level_;
-    extern const std::unordered_map< tecslog::Level, std::string > level_map;
-    extern const std::unordered_map< std::string, tecslog::Level > str_level_map;
-
     class LogWriter
     {
     public:
@@ -37,17 +31,20 @@ namespace tecslog
       std::mutex mutex_queue_;
       std::condition_variable cond_;
 
-      std::string config_filename_;
-      std::string open_filename_;
+      std::string filename_;
       std::ofstream out_;
+      std::ofstream out_default_;
       std::mutex mutex_file_;
       std::error_code file_state_;
 
       std::atomic< bool > stopped_;
       std::thread writer_;
 
-      void tryFileOpen();
       void write();
+
+      void tryFileOpen();
+      std::ofstream* chooseOut();
+      void closeFiles();
     };
   }
   class Logger
