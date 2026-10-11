@@ -24,6 +24,39 @@ std::error_code tecslog::init(const std::string& filename, const std::string& le
   return logger.setLevel(level);
 }
 
+tecslog::Level tecslog::getLevel()
+{
+  Logger& logger = Logger::instance();
+  return logger.getLevel();
+}
+
+std::string tecslog::getFile()
+{
+  Logger& logger = Logger::instance();
+  return logger.getFile();
+}
+
+bool tecslog::getFallback()
+{
+  Logger& logger = Logger::instance();
+  return logger.getFallback();
+}
+
+tecslog::Level tecslog::getDefaultLevel()
+{
+  return default_level;
+}
+
+std::string tecslog::getDefaultFile()
+{
+  return default_filename;
+}
+
+bool tecslog::getDefaultFallback()
+{
+  return default_fallback;
+}
+
 std::error_code tecslog::setLevel(Level level)
 {
   Logger& logger = Logger::instance();
@@ -36,6 +69,18 @@ std::error_code tecslog::setLevel(const std::string& level)
   return logger.setLevel(level);
 }
 
+std::error_code tecslog::setFile(const std::string& filename)
+{
+  Logger& logger = Logger::instance();
+  return logger.setFile(filename);
+}
+
+std::error_code tecslog::setFallback(bool fallback)
+{
+  Logger& logger = Logger::instance();
+  return logger.setFallback(fallback);
+}
+
 std::ostream& tecslog::printPossibleLevels(std::ostream& out)
 {
   out << 0 << ' ' << Logger::levelToStr(Level::MIN);
@@ -44,33 +89,6 @@ std::ostream& tecslog::printPossibleLevels(std::ostream& out)
     out << '\n' << i << ' ' << Logger::levelToStr(static_cast< Level >(i));
   }
   return out;
-}
-
-std::optional< tecslog::Level > tecslog::parseLevel(const std::string& str_level)
-{
-  return Logger::strToLevel(str_level);
-}
-
-tecslog::Level tecslog::getLevel()
-{
-  Logger& logger = Logger::instance();
-  return logger.getLevel();
-}
-
-std::string tecslog::getLogFile()
-{
-  Logger& logger = Logger::instance();
-  return logger.getLogFile();
-}
-
-tecslog::Level tecslog::getDefaultLevel()
-{
-  return default_level;
-}
-
-std::string tecslog::getDefaultLogFile()
-{
-  return default_filename;
 }
 
 void tecslog::reset()

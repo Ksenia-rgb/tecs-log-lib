@@ -39,137 +39,26 @@ namespace
   }
 }
 
-tecslog::detail::LogWriter::LogWriter(const std::string& filename):
-  out_default_(default_filename),
-  stopped_(false)
+std::string tecslog::detail::levelToStr(Level level)
 {
-  setFile(filename);
-  writer_ = std::thread(&LogWriter::write, this);
+  return str_level[level];
 }
 
-tecslog::detail::LogWriter::~LogWriter()
+std::optional< tecslog::Level > tecslog::detail::strToLevel(const std::string& level)
 {
-  stopped_.store(true);
-  cond_.notify_all();
+  std::string level_up = strToUpper(level);
 
-  if (writer_.joinable())
+  auto level_iter = std::find(str_level.begin(), str_level.end(), level_up);
+  if (level_iter != str_level.end())
   {
-    writer_.join();
+    size_t index = std::distance(str_level.begin(), level_iter);
+    return static_cast< Level >(index);
   }
-  closeFiles();
-}
-
-std::error_code tecslog::detail::LogWriter::setFile(const std::string& filename)
-{
-  std::lock_guard< std::mutex > lock(mutex_file_);
-  filename_ = filename;
-  tryFileOpen();
-  return file_state_;
-}
-
-std::string tecslog::detail::LogWriter::getFile()
-{
-  std::lock_guard< std::mutex > lock(mutex_file_);
-  return filename_;
-}
-
-std::error_code tecslog::detail::LogWriter::push(std::string message)
-{
-  {
-    std::lock_guard< std::mutex > lock(mutex_queue_);
-    log_queue_.push_back(std::move(message));
-  }
-  cond_.notify_one();
-
-  std::lock_guard< std::mutex > lock(mutex_file_);
-  return file_state_;
-}
-
-void tecslog::detail::LogWriter::reset()
-{
-  std::lock_guard< std::mutex > lock(mutex_file_);
-  closeFiles();
-  out_default_.open(default_filename);
-  filename_ = default_filename;
-  file_state_ = {};
-}
-
-void tecslog::detail::LogWriter::write()
-{
-  while (!stopped_)
-  {
-    std::unique_lock< std::mutex > lock(mutex_queue_);
-    cond_.wait(lock, [this]{ return stopped_.load() || !log_queue_.empty(); });
-    if (log_queue_.empty())
-    {
-      break;
-    }
-
-    std::deque< std::string > copy = std::move(log_queue_);
-    lock.unlock();
-
-    std::lock_guard< std::mutex > lock_file(mutex_file_);
-    std::ostream* fout = chooseOut();
-    std::copy(
-      copy.begin(),
-      copy.end(),
-      std::ostream_iterator< std::string >(*fout, "\n")
-    );
-    fout->flush();
-  }
-
-  std::lock_guard< std::mutex > lock_file(mutex_file_);
-  std::ostream* fout = chooseOut();
-  std::copy(
-    log_queue_.begin(),
-    log_queue_.end(),
-    std::ostream_iterator< std::string >(*fout, "\n")
-  );
-  fout->flush();
-}
-
-void tecslog::detail::LogWriter::tryFileOpen()
-{
-  if (out_.is_open() && filename_ != default_filename)
-  {
-    out_.flush();
-    out_.close();
-  }
-  if (filename_ == default_filename)
-  {
-    file_state_ = {};
-    return;
-  }
-  out_.open(filename_, std::ios::app);
-  file_state_ = !out_.is_open() ? std::make_error_code(std::errc::no_such_file_or_directory) : std::error_code{};
-  return;
-}
-
-std::ofstream* tecslog::detail::LogWriter::chooseOut()
-{
-  if (file_state_ || filename_ == default_filename)
-  {
-    return &out_default_;
-  }
-  return &out_;
-}
-
-void tecslog::detail::LogWriter::closeFiles()
-{
-  if (out_.is_open())
-  {
-    out_.flush();
-    out_.close();
-  }
-  if (out_default_.is_open())
-  {
-    out_default_.flush();
-    out_default_.close();
-  }
+  return {};
 }
 
 tecslog::Logger::Logger():
-  writer_(default_filename),
+  writer_(default_filename, default_fallback),
   level_(default_level)
 {}
 
@@ -179,9 +68,19 @@ tecslog::Logger& tecslog::Logger::instance()
   return logger_instance;
 }
 
-std::error_code tecslog::Logger::setFile(const std::string& filename)
+tecslog::Level tecslog::Logger::getLevel()
 {
-  return writer_.setFile(filename);
+  return level_;
+}
+
+std::string tecslog::Logger::getFile()
+{
+  return writer_.getFile();
+}
+
+bool tecslog::Logger::getFallback()
+{
+  return writer_.getFallback();
 }
 
 std::error_code tecslog::Logger::setLevel(Level level)
@@ -195,7 +94,7 @@ std::error_code tecslog::Logger::setLevel(Level level)
 
 std::error_code tecslog::Logger::setLevel(const std::string& str_level)
 {
-  std::optional< Level > level = strToLevel(str_level);
+  std::optional< Level > level = detail::strToLevel(str_level);
   if (level.has_value())
   {
     return setLevel(level.value());
@@ -204,14 +103,14 @@ std::error_code tecslog::Logger::setLevel(const std::string& str_level)
   return std::make_error_code(std::errc::invalid_argument);
 }
 
-tecslog::Level tecslog::Logger::getLevel()
+std::error_code tecslog::Logger::setFile(const std::string& filename)
 {
-  return level_;
+  return writer_.setFile(filename);
 }
 
-std::string tecslog::Logger::getLogFile()
+std::error_code tecslog::Logger::setFallback(bool fallback)
 {
-  return writer_.getFile();
+  return writer_.setFallback(fallback);
 }
 
 void tecslog::Logger::reset()
@@ -239,14 +138,14 @@ std::error_code tecslog::Logger::log(Level level, const std::string& message)
 {
   if (level >= level_)
   {
-    return sendLog(levelToStr(level), message);
+    return sendLog(detail::levelToStr(level), message);
   }
   return {};
 }
 
 std::error_code tecslog::Logger::log(const std::string& str_level, const std::string& message)
 {
-  std::optional< Level > level = strToLevel(str_level);
+  std::optional< Level > level = detail::strToLevel(str_level);
   if (!level.has_value())
   {
     return std::make_error_code(std::errc::invalid_argument);
@@ -263,22 +162,4 @@ std::error_code tecslog::Logger::sendLog(const std::string& str_level, const std
 {
   std::string formatted = strNowTime() + " [" + str_level + "] " + message;
   return writer_.push(std::move(formatted));
-}
-
-std::string tecslog::Logger::levelToStr(Level level)
-{
-  return str_level[level];
-}
-
-std::optional< tecslog::Level > tecslog::Logger::strToLevel(const std::string& level)
-{
-  std::string level_up = strToUpper(level);
-
-  auto level_iter = std::find(str_level.begin(), str_level.end(), level_up);
-  if (level_iter != str_level.end())
-  {
-    size_t index = std::distance(str_level.begin(), level_iter);
-    return static_cast< Level >(index);
-  }
-  return {};
 }
