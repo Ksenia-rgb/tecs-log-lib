@@ -13,18 +13,18 @@ int main(int argc, char** argv)
 {
   using namespace std::placeholders;
 
-  if (argc != 3)
-  {
-    std::cerr << "Incorrect programm argument count\n";
-    return 1;
-  }
-  if (std::error_code code = tecslog::init(argv[1], argv[2], true); code)
+  if (std::error_code code = tecslog::init(); code)
   {
     std::cerr << "Incorrect argument for lib initialization: " << code << '\n';
   }
 
   std::unordered_map< std::string, std::function< std::error_code(std::istream&, std::ostream&) > > command_map;
-  command_map["default"] = demo::defaultCommand;
+  command_map["get-level"] = demo::getLevelCommand;
+  command_map["get-file"] = demo::getFileCommand;
+  command_map["get-fallback"] = demo::getFallbackCommand;
+  command_map["set-level"] = demo::setLevelCommand;
+  command_map["set-file"] = demo::setFileCommand;
+  command_map["set-fallback"] = demo::setFallbackCommand;
   command_map["log"] = demo::logCommand;
   command_map["help"] = demo::helpCommand;
 
