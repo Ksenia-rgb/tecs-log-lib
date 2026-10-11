@@ -2,50 +2,10 @@
 
 #include "logger.hpp"
 
-std::error_code tecslog::init(const std::string& filename, Level level, bool fallback)
+std::error_code tecslog::init()
 {
   Logger& logger = Logger::instance();
-  std::error_code code = logger.setFile(filename);
-  if (code)
-  {
-    return code;
-  }
-  code = logger.setLevel(level);
-  if (code)
-  {
-    logger.reset();
-    return code;
-  }
-  code = logger.setFallback(fallback);
-  if (code)
-  {
-    logger.reset();
-    return code;
-  }
-  return {};
-}
-
-std::error_code tecslog::init(const std::string& filename, const std::string& level, bool fallback)
-{
-  Logger& logger = Logger::instance();
-  std::error_code code = logger.setFile(filename);
-  if (code)
-  {
-    return code;
-  }
-  code = logger.setLevel(level);
-  if (code)
-  {
-    logger.reset();
-    return code;
-  }
-  code = logger.setFallback(fallback);
-  if (code)
-  {
-    logger.reset();
-    return code;
-  }
-  return {};
+  return logger.getState();
 }
 
 tecslog::Level tecslog::getLevel()

@@ -9,8 +9,7 @@
 
 namespace tecslog
 {
-  std::error_code init(const std::string& filename, Level level, bool fallback);
-  std::error_code init(const std::string& filename, const std::string& level, bool fallback);
+  std::error_code init();
 
   Level getLevel();
   std::string getFile();

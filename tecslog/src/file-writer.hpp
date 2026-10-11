@@ -40,6 +40,7 @@ namespace tecslog
 
       std::string getFile();
       bool getFallback();
+      std::error_code getState();
 
       std::error_code setFile(const std::string& filename);
       std::error_code setFallback(bool fallback);
