@@ -105,6 +105,11 @@ bool tecslog::detail::LogWriter::getFallback()
   return fallback_;
 }
 
+std::error_code tecslog::detail::LogWriter::getState()
+{
+  return chooseFout().getState();
+}
+
 std::error_code tecslog::detail::LogWriter::setFile(const std::string& filename)
 {
   std::lock_guard< std::mutex > lock(mutex_file_);

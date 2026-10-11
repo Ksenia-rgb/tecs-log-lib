@@ -83,6 +83,11 @@ bool tecslog::Logger::getFallback()
   return writer_.getFallback();
 }
 
+std::error_code tecslog::Logger::getState()
+{
+  return writer_.getState();
+}
+
 std::ostream& tecslog::Logger::printLevels(std::ostream& out)
 {
   out << 0 << ' ' << detail::levelToStr(Level::MIN);
