@@ -15,7 +15,7 @@ namespace tecslog
   };
 
   const std::string default_filename = "tecslog.log";
-  const tecslog::Level default_level = tecslog::Level::MIN;
+  const Level default_level = Level::MIN;
   const bool default_fallback = false;
 }
 

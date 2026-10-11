@@ -97,7 +97,7 @@ tecslog::detail::LogWriter::~LogWriter()
 std::string tecslog::detail::LogWriter::getFile()
 {
   std::lock_guard< std::mutex > lock(mutex_file_);
-  return filename_;
+  return chooseFout().getFile();
 }
 
 bool tecslog::detail::LogWriter::getFallback()
