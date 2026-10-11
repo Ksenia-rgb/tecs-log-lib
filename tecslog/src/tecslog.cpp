@@ -2,7 +2,7 @@
 
 #include "logger.hpp"
 
-std::error_code tecslog::init(const std::string& filename, Level level)
+std::error_code tecslog::init(const std::string& filename, Level level, bool fallback)
 {
   Logger& logger = Logger::instance();
   std::error_code code = logger.setFile(filename);
@@ -10,10 +10,22 @@ std::error_code tecslog::init(const std::string& filename, Level level)
   {
     return code;
   }
-  return logger.setLevel(level);
+  code = logger.setLevel(level);
+  if (code)
+  {
+    logger.reset();
+    return code;
+  }
+  code = logger.setFallback(fallback);
+  if (code)
+  {
+    logger.reset();
+    return code;
+  }
+  return {};
 }
 
-std::error_code tecslog::init(const std::string& filename, const std::string& level)
+std::error_code tecslog::init(const std::string& filename, const std::string& level, bool fallback)
 {
   Logger& logger = Logger::instance();
   std::error_code code = logger.setFile(filename);
@@ -21,7 +33,19 @@ std::error_code tecslog::init(const std::string& filename, const std::string& le
   {
     return code;
   }
-  return logger.setLevel(level);
+  code = logger.setLevel(level);
+  if (code)
+  {
+    logger.reset();
+    return code;
+  }
+  code = logger.setFallback(fallback);
+  if (code)
+  {
+    logger.reset();
+    return code;
+  }
+  return {};
 }
 
 tecslog::Level tecslog::getLevel()
@@ -81,14 +105,10 @@ std::error_code tecslog::setFallback(bool fallback)
   return logger.setFallback(fallback);
 }
 
-std::ostream& tecslog::printPossibleLevels(std::ostream& out)
+std::ostream& tecslog::printLevels(std::ostream& out)
 {
-  out << 0 << ' ' << Logger::levelToStr(Level::MIN);
-  for (int i = static_cast< int >(Level::MIN) + 1; i <= static_cast< int >(Level::MAX); i++)
-  {
-    out << '\n' << i << ' ' << Logger::levelToStr(static_cast< Level >(i));
-  }
-  return out;
+  Logger& logger = Logger::instance();
+  return logger.printLevels(out);
 }
 
 void tecslog::reset()

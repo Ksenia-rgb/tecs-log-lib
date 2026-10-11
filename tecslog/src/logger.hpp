@@ -26,6 +26,7 @@ namespace tecslog
     Level getLevel();
     std::string getFile();
     bool getFallback();
+    std::ostream& printLevels(std::ostream& out);
 
     std::error_code setFile(const std::string& filename);
     std::error_code setLevel(Level level);

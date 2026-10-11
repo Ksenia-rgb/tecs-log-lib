@@ -83,6 +83,16 @@ bool tecslog::Logger::getFallback()
   return writer_.getFallback();
 }
 
+std::ostream& tecslog::Logger::printLevels(std::ostream& out)
+{
+  out << 0 << ' ' << detail::levelToStr(Level::MIN);
+  for (int i = static_cast< int >(Level::MIN) + 1; i <= static_cast< int >(Level::MAX); i++)
+  {
+    out << '\n' << i << ' ' << detail::levelToStr(static_cast< Level >(i));
+  }
+  return out;
+}
+
 std::error_code tecslog::Logger::setLevel(Level level)
 {
   if (level_ != level)
