@@ -126,8 +126,8 @@ std::error_code demo::logCommand(std::istream& in, std::ostream& out)
 std::error_code demo::helpCommand(std::istream& in, std::ostream& out)
 {
   out << "Commands:\n"
-    << "\t1 default <level>\t= Specify default log level, logs with a lower level will not be recorded\n"
-    << "\t3 log <message> <level>\t= Log message with level\n";
+    << "1 default <level>\t= Specify default log level, logs with a lower level will not be recorded\n"
+    << "2 log <message> <level>\t= Log message with level\n";
 
   out << "Log levels:\n";
   tecslog::printLevels(out);
