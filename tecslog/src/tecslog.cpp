@@ -2,26 +2,43 @@
 
 #include "logger.hpp"
 
-std::error_code tecslog::init(const std::string& filename, Level level)
+std::error_code tecslog::init()
 {
   Logger& logger = Logger::instance();
-  std::error_code code = logger.setFile(filename);
-  if (code)
-  {
-    return code;
-  }
-  return logger.setLevel(level);
+  return logger.getState();
 }
 
-std::error_code tecslog::init(const std::string& filename, const std::string& level)
+tecslog::Level tecslog::getLevel()
 {
   Logger& logger = Logger::instance();
-  std::error_code code = logger.setFile(filename);
-  if (code)
-  {
-    return code;
-  }
-  return logger.setLevel(level);
+  return logger.getLevel();
+}
+
+std::string tecslog::getFile()
+{
+  Logger& logger = Logger::instance();
+  return logger.getFile();
+}
+
+bool tecslog::getFallback()
+{
+  Logger& logger = Logger::instance();
+  return logger.getFallback();
+}
+
+tecslog::Level tecslog::getDefaultLevel()
+{
+  return default_level;
+}
+
+std::string tecslog::getDefaultFile()
+{
+  return default_filename;
+}
+
+bool tecslog::getDefaultFallback()
+{
+  return default_fallback;
 }
 
 std::error_code tecslog::setLevel(Level level)
@@ -36,31 +53,22 @@ std::error_code tecslog::setLevel(const std::string& level)
   return logger.setLevel(level);
 }
 
-std::ostream& tecslog::printPossibleLevels(std::ostream& out)
-{
-  out << 0 << ' ' << Logger::levelToStr(Level::MIN);
-  for (int i = static_cast< int >(Level::MIN) + 1; i <= static_cast< int >(Level::MAX); i++)
-  {
-    out << '\n' << i << ' ' << Logger::levelToStr(static_cast< Level >(i));
-  }
-  return out;
-}
-
-std::optional< tecslog::Level > tecslog::parseLevel(const std::string& str_level)
-{
-  return Logger::strToLevel(str_level);
-}
-
-tecslog::Level tecslog::getDefaultLevel()
+std::error_code tecslog::setFile(const std::string& filename)
 {
   Logger& logger = Logger::instance();
-  return logger.getDefaultLevel();
+  return logger.setFile(filename);
 }
 
-std::string tecslog::getLogFile()
+std::error_code tecslog::setFallback(bool fallback)
 {
   Logger& logger = Logger::instance();
-  return logger.getLogFile();
+  return logger.setFallback(fallback);
+}
+
+std::ostream& tecslog::printLevels(std::ostream& out)
+{
+  Logger& logger = Logger::instance();
+  return logger.printLevels(out);
 }
 
 void tecslog::reset()

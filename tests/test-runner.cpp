@@ -9,9 +9,7 @@ test::TestRegistrator::TestRegistrator(const std::string& name, std::function< b
 
 test::TestFileGuard::TestFileGuard(const std::string& filename):
   filename_(filename)
-{
-  std::filesystem::remove(filename_);
-}
+{}
 
 test::TestFileGuard::~TestFileGuard()
 {

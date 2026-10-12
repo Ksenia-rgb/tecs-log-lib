@@ -1,21 +1,35 @@
 #include "logger.hpp"
 
 #include <algorithm>
-#include <cctype>
-#include <ctime>
-#include <iomanip>
+#include <chrono>
 #include <filesystem>
 #include <optional>
-#include <unordered_map>
+#include <iterator>
+#include <thread>
+#include <iostream>
 
 namespace
 {
-  std::ostream& out_now_time(std::ostream& out)
+  std::string strNowTime();
+  std::string strToUpper(const std::string& str);
+
+  std::string strNowTime()
   {
-    std::time_t now_c = std::time(nullptr);
-    return out << std::put_time(std::localtime(&now_c), "%d.%m.%Y %H:%M:%S");
+    auto now = std::chrono::system_clock::now();
+    std::time_t now_c = std::chrono::system_clock::to_time_t(now);
+    
+    std::tm tm{};
+    #ifdef _WIN32
+      localtime_s(&tm, &now_c);
+    #else
+      localtime_r(&now_c, &tm);
+    #endif
+    
+    std::ostringstream oss;
+    oss << std::put_time(&tm, "%d.%m.%Y %H:%M:%S");
+    return oss.str();
   }
-  std::string strToupper(const std::string& str)
+  std::string strToUpper(const std::string& str)
   {
     std::string upper;
     std::transform(str.begin(), str.end(), std::back_inserter(upper),
@@ -25,36 +39,28 @@ namespace
   }
 }
 
-const std::string tecslog::Logger::default_filename_ = "tecslog.log";
-const tecslog::Level tecslog::Logger::default_level_ = tecslog::Level::MIN;
-const std::unordered_map< tecslog::Level, std::string > tecslog::Logger::level_map = {
-  {tecslog::Level::INFO, "INFO"},
-  {tecslog::Level::WARNING, "WARNING"},
-  {tecslog::Level::ERROR, "ERROR"}
-};
-const std::unordered_map< std::string, tecslog::Level > tecslog::Logger::str_level_map = {
-  {"INFO", tecslog::Level::INFO},
-  {"WARNING", tecslog::Level::WARNING},
-  {"ERROR", tecslog::Level::ERROR}
-};
+std::string tecslog::detail::levelToStr(Level level)
+{
+  return str_level[level];
+}
+
+std::optional< tecslog::Level > tecslog::detail::strToLevel(const std::string& level)
+{
+  std::string level_up = strToUpper(level);
+
+  auto level_iter = std::find(str_level.begin(), str_level.end(), level_up);
+  if (level_iter != str_level.end())
+  {
+    size_t index = std::distance(str_level.begin(), level_iter);
+    return static_cast< Level >(index);
+  }
+  return {};
+}
 
 tecslog::Logger::Logger():
-  config_filename_(default_filename_),
-  open_filename_(),
-  level_(default_level_),
-  out_(),
-  mutex_level(),
-  mutex_file()
+  writer_(default_filename, default_fallback),
+  level_(default_level)
 {}
-
-tecslog::Logger::~Logger()
-{
-  if (isFileOpen())
-  {
-    out_.flush();
-    out_.close();
-  }
-}
 
 tecslog::Logger& tecslog::Logger::instance()
 {
@@ -62,70 +68,70 @@ tecslog::Logger& tecslog::Logger::instance()
   return logger_instance;
 }
 
-std::error_code tecslog::Logger::setFile(const std::string& filename)
+tecslog::Level tecslog::Logger::getLevel()
 {
-  namespace fs = std::filesystem;
-
-  std::error_code code;
-  fs::path file_path{filename};
-  fs::path dir_path = file_path.parent_path();
-  if (!dir_path.empty() && !fs::exists(dir_path, code))
-  {
-    return code ? code : std::make_error_code(std::errc::no_such_file_or_directory);
-  }
-
-  if (config_filename_ != filename)
-  {
-    std::lock_guard< std::mutex > lock(mutex_file);
-    config_filename_ = filename;
-  }
-  return {};
+  return level_;
 }
 
-bool tecslog::Logger::isFileOpen()
+std::string tecslog::Logger::getFile()
 {
-  return out_.is_open();
+  return writer_.getFile();
+}
+
+bool tecslog::Logger::getFallback()
+{
+  return writer_.getFallback();
+}
+
+std::error_code tecslog::Logger::getState()
+{
+  return writer_.getState();
+}
+
+std::ostream& tecslog::Logger::printLevels(std::ostream& out)
+{
+  out << 0 << ' ' << detail::levelToStr(Level::MIN);
+  for (int i = static_cast< int >(Level::MIN) + 1; i <= static_cast< int >(Level::MAX); i++)
+  {
+    out << '\n' << i << ' ' << detail::levelToStr(static_cast< Level >(i));
+  }
+  return out;
 }
 
 std::error_code tecslog::Logger::setLevel(Level level)
 {
   if (level_ != level)
   {
-    std::lock_guard< std::mutex > lock(mutex_level);
-    level_ = level;
+    level_.store(level);
   }
   return {};
 }
 
 std::error_code tecslog::Logger::setLevel(const std::string& str_level)
 {
-  std::optional< Level > level = strToLevel(str_level);
+  std::optional< Level > level = detail::strToLevel(str_level);
   if (level.has_value())
   {
     return setLevel(level.value());
   }
+  setLevel(default_level);
   return std::make_error_code(std::errc::invalid_argument);
 }
 
-tecslog::Level tecslog::Logger::getDefaultLevel()
+std::error_code tecslog::Logger::setFile(const std::string& filename)
 {
-  return level_;
+  return writer_.setFile(filename);
 }
 
-std::string tecslog::Logger::getLogFile()
+std::error_code tecslog::Logger::setFallback(bool fallback)
 {
-  return config_filename_;
+  return writer_.setFallback(fallback);
 }
 
 void tecslog::Logger::reset()
 {
-  std::lock_guard< std::mutex > lock_level(mutex_level);
-  std::lock_guard< std::mutex > lock_file(mutex_file);
-  config_filename_ = default_filename_;
-  open_filename_ = "";
-  level_ = default_level_;
-  out_.close();
-  out_ = std::ofstream();
+  level_.store(default_level);
+  writer_.reset();
 }
 
 std::error_code tecslog::Logger::info(const std::string& message)
@@ -147,14 +153,14 @@ std::error_code tecslog::Logger::log(Level level, const std::string& message)
 {
   if (level >= level_)
   {
-    return uncheckLevelLog(levelToStr(level), message);
+    return sendLog(detail::levelToStr(level), message);
   }
   return {};
 }
 
 std::error_code tecslog::Logger::log(const std::string& str_level, const std::string& message)
 {
-  std::optional< Level > level = strToLevel(str_level);
+  std::optional< Level > level = detail::strToLevel(str_level);
   if (!level.has_value())
   {
     return std::make_error_code(std::errc::invalid_argument);
@@ -162,57 +168,13 @@ std::error_code tecslog::Logger::log(const std::string& str_level, const std::st
 
   if (level.value() >= level_)
   {
-    return uncheckLevelLog(str_level, message);
+    return sendLog(str_level, message);
   }
   return {};
 }
 
-std::error_code tecslog::Logger::uncheckLevelLog(const std::string& str_level, const std::string& message)
+std::error_code tecslog::Logger::sendLog(const std::string& str_level, const std::string& message)
 {
-  std::error_code file_code = ensureFileOpen();
-  if (file_code)
-  {
-    return file_code;
-  }
-
-  std::lock_guard< std::mutex > lock(mutex_file);
-  out_now_time(out_) << " [" << str_level << "] " << message << std::endl;
-  if (!out_)
-  {
-    return std::make_error_code(std::errc::io_error);
-  }
-  return {};
-}
-
-std::error_code tecslog::Logger::ensureFileOpen()
-{
-  if (out_.is_open() && config_filename_ == open_filename_)
-  {
-    return {};
-  }
-  if (!out_.is_open() && config_filename_ == open_filename_)
-  {
-    return std::make_error_code(std::errc::no_such_file_or_directory);
-  }
-  out_.close();
-  out_.open(config_filename_, std::ios::app);
-  open_filename_ = config_filename_;
-  return !out_.is_open() ? std::make_error_code(std::errc::no_such_file_or_directory) : std::error_code{};
-}
-
-std::string tecslog::Logger::levelToStr(Level level)
-{
-  return level_map.find(level)->second;
-}
-
-std::optional< tecslog::Level > tecslog::Logger::strToLevel(const std::string& level)
-{
-  std::string level_up = strToupper(level);
-
-  auto level_iter = str_level_map.find(level_up);
-  if (level_iter != str_level_map.end())
-  {
-    return level_iter->second;
-  }
-  return {};
+  std::string formatted = strNowTime() + " [" + str_level + "] " + message;
+  return writer_.push(std::move(formatted));
 }
