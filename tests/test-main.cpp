@@ -4,6 +4,6 @@
 
 int main()
 {
-  test::TestFileGuard guard(tecslog::getDefaultLogFile());
+  test::TestFileGuard guard(tecslog::getDefaultFile());
   return test::runAllTests();
 }

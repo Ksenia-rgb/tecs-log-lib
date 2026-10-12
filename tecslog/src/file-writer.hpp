@@ -12,6 +12,16 @@ namespace tecslog
 {
   namespace detail
   {
+    struct LogEntry;
+    struct FileOutInfo;
+    struct LogWriter;
+
+    struct LogEntry
+    {
+      std::string message;
+      FileOutInfo* fout;
+    };
+
     class FileOutInfo
     {
     public:
@@ -25,7 +35,8 @@ namespace tecslog
       std::error_code changeFile(const std::string& filename);
       void open();
       void close();
-      void clear();
+      void flush();
+      void clearState();
     private:
       std::ofstream fout_;
       std::string filename_;
@@ -46,11 +57,13 @@ namespace tecslog
       std::error_code setFallback(bool fallback);
 
       std::error_code push(std::string message);
+      void flush();
       void reset();
     private:
-      std::deque< std::string > log_queue_;
+      std::deque< LogEntry > log_queue_;
       std::mutex mutex_queue_;
       std::condition_variable cond_queue_;
+      std::condition_variable cond_flush_;
 
       std::string filename_;
       FileOutInfo fout_default_;

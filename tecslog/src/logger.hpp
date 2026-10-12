@@ -33,7 +33,7 @@ namespace tecslog
     std::error_code setLevel(Level level);
     std::error_code setLevel(const std::string& str_level);
     std::error_code setFallback(bool fallback);
-    
+
     void reset();
 
     std::error_code info(const std::string& message);

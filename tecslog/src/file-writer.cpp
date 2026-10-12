@@ -14,7 +14,7 @@ tecslog::detail::FileOutInfo::FileOutInfo(const std::string& filename, bool open
 
 tecslog::detail::FileOutInfo::~FileOutInfo()
 {
-  clear();
+  clearState();
   close();
 }
 
@@ -60,7 +60,15 @@ void tecslog::detail::FileOutInfo::close()
   }
 }
 
-void tecslog::detail::FileOutInfo::clear()
+void tecslog::detail::FileOutInfo::flush()
+{
+  if (fout_.is_open())
+  {
+    fout_.flush();
+  }
+}
+
+void tecslog::detail::FileOutInfo::clearState()
 {
   state_ = std::error_code{};
 }
@@ -102,28 +110,33 @@ std::string tecslog::detail::LogWriter::getFile()
 
 bool tecslog::detail::LogWriter::getFallback()
 {
+  std::lock_guard< std::mutex > lock(mutex_file_);
   return fallback_;
 }
 
 std::error_code tecslog::detail::LogWriter::getState()
 {
+  std::lock_guard< std::mutex > lock(mutex_file_);
   return chooseFout().getState();
 }
 
 std::error_code tecslog::detail::LogWriter::setFile(const std::string& filename)
 {
   std::lock_guard< std::mutex > lock(mutex_file_);
+  std::error_code return_code;
   if (filename != default_filename)
   {
     fout_.changeFile(filename);
+    return_code = fout_.getState();
   }
   else
   {
-    fout_.clear();
+    fout_.clearState();
     fout_.close();
+    return_code = fout_default_.getState();
   }
   filename_ = filename;
-  return chooseFout().getState();
+  return return_code;
 }
 
 std::error_code tecslog::detail::LogWriter::setFallback(bool fallback)
@@ -139,23 +152,27 @@ std::error_code tecslog::detail::LogWriter::setFallback(bool fallback)
 
 std::error_code tecslog::detail::LogWriter::push(std::string message)
 {
+  FileOutInfo* fout = nullptr;
+  {
+    std::lock_guard< std::mutex > lock(mutex_file_);
+    fout = &chooseFout();
+  }
   {
     std::lock_guard< std::mutex > lock(mutex_queue_);
-    log_queue_.push_back(std::move(message));
+    log_queue_.push_back({message, fout});
   }
   cond_queue_.notify_one();
-
-  std::lock_guard< std::mutex > lock(mutex_file_);
-  return chooseFout().getState();
+  return fout->getState();
 }
 
 void tecslog::detail::LogWriter::reset()
 {
   std::lock_guard< std::mutex > lock(mutex_file_);
-  fout_.clear();
+  fout_.clearState();
   fout_.close();
   fout_default_.changeFile(default_filename);
   filename_ = default_filename;
+  fallback_ = default_fallback;
 }
 
 void tecslog::detail::LogWriter::write()
@@ -169,27 +186,34 @@ void tecslog::detail::LogWriter::write()
       break;
     }
 
-    std::deque< std::string > copy = std::move(log_queue_);
+    std::deque< LogEntry > copy = std::move(log_queue_);
     lock.unlock();
 
     std::lock_guard< std::mutex > lock_file(mutex_file_);
-    std::ofstream& fout = chooseFout().getFout();
-    std::copy(
-      copy.begin(),
-      copy.end(),
-      std::ostream_iterator< std::string >(fout, "\n")
-    );
-    fout.flush();
+    for (LogEntry& entry: copy)
+    {
+      if (!entry.fout->getState())
+      {
+        entry.fout->getFout() << entry.message << '\n';
+      }
+    }
+    fout_.flush();
+    fout_default_.flush();
+  }
+
+  std::deque< LogEntry > tail;
+  {
+    std::lock_guard< std::mutex > lock(mutex_queue_);
+    std::swap(log_queue_, tail);
   }
 
   std::lock_guard< std::mutex > lock_file(mutex_file_);
-  std::ostream& fout = chooseFout().getFout();
-  std::copy(
-    log_queue_.begin(),
-    log_queue_.end(),
-    std::ostream_iterator< std::string >(fout, "\n")
-  );
-  fout.flush();
+  for (LogEntry& entry: tail)
+  {
+    entry.fout->getFout() << entry.message << '\n';
+  }
+  fout_.flush();
+  fout_default_.flush();
 }
 
 tecslog::detail::FileOutInfo& tecslog::detail::LogWriter::chooseFout()
