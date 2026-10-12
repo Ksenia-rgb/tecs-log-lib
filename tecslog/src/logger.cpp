@@ -130,8 +130,8 @@ std::error_code tecslog::Logger::setFallback(bool fallback)
 
 void tecslog::Logger::reset()
 {
-  writer_.reset();
   level_.store(default_level);
+  writer_.reset();
 }
 
 std::error_code tecslog::Logger::info(const std::string& message)
