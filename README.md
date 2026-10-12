@@ -94,7 +94,7 @@ std::error_code tecslog::setFallback(bool);
   - Всегда нулевой код ошибки.
 
 ### Команды логирования
-Логирование может происходит с помощью функций, сразу содержащих в себе уровень:
+Логирование может выполняться с помощью функций, сразу содержащих в себе уровень:
 ```c++
 std::error_code info(std::string);
 std::error_code warning(std::string);
@@ -102,7 +102,7 @@ std::error_code error(std::string);
 ```
 Параметры функций: только сообщение лога.
 
-Также логирование может происходить с помощью функций, требующий указания уровня вручную:
+Также логирование может выполняться с помощью функций, требующий указания уровня вручную:
 ```c++
 std::error_code log(Level, const std::string);
 std::error_code log(std::string, std::string);
@@ -187,55 +187,92 @@ int main()
 int main() 
 {
   tecslog::init();
+
+  // let's think, that file "test.log" is correct
+  std::error_code code_file = tecslog::setFile("test.log");
   
+  std::string file = tecslog::getFile();
+  std::error_code code_info = tecslog::info("Info mess");
+
+  // the following file is most likely incorrect
+  code_file = tecslog::setFile("unreal-dir/imagine-dir/test.log");
+  if (code_file)
+  {
+    // set fallback true, logs will be written in default file
+    tecslog::setFallback(true);
+  }
+
+  // user file is incorrect, but fallback is true - getFile will return default file
+  file = tecslog::getFile();
+  code_info = tecslog::info("Seconf info mess");
 }
 ```
 
-## Использование демонстанционного приложения
-- Запуск демонстрационного приложения с передачей параметров:
-```
-make run ARGS="logs/monday.log INFO"
-```
-### Параметры приложения
-1. Имя файла журнала для записи логов
-2. Уровень важности сообщения по умолчанию
+## Демонстанционное приложение
+Демонстрационное приложение является консольным: ожидает от пользователя ввода определенных команд и их параметров при необходимости со стандартного ввода и возвращает ответ.
 
 ### Пользовательские команды
-Демонстрационное приложение является консольным. Пользователю доступны такие команды:
-- Установка нового уровня важности сообщения по умолчанию. В параметрах указывает *уровень*.
-
-`default <level>`
-
-- Установка уровня важности сообщения, который будет использован, если уровень не был указан в команде log. В параметрах указывается *уровень*.
-
-`silence <level>`
-
-- Запись лога в журнал. Параметры:
-  - *Сообщение*. Если в сообщении есть пробелы, оно должно быть обозначено кавычками (message, "message", "long message")
-  - *Уровень*. Опциональный параметр. Может быть опущен, если до этого была использована команда `silence`, в этом случае сообщение логируется с уровнем, указанным в последней команде `silence`.
-
-`log <message> [level]`
-
-- Вывод вспомогательной информации о командах.
-
-`help`
+Пользователю доступны такие команды:
+- Получение текущего значения уровня:
+```
+get-level
+```
+- Получение текущего значения файла:
+```
+get-file
+```
+- Получение текущего значения fallback:
+```
+get-fallback
+```
+- Установка нового значения уровня, в параметрах указывается *уровень*:
+```
+set-level <level>
+```
+- Установка нового значения файла, в параметрах указывается *файл*:
+```
+set-file <file>
+```
+- Установка нового значения fallback, в параметрах указывается *fallback*:
+```
+set-fallback <fallback>
+```
+- Запись лога в журнал, параметры:
+  - *сообщение* (если в сообщении есть пробелы, оно должно быть обозначено кавычками (message, "message", "long message")),
+  - *уровень*;
+```
+log <message> <level>
+```
+- Вывод вспомогательной информации о командах:
+```
+help
+```
 
 
 Признаком конца пользовательского ввода является EOF (на Linux: Ctrl + D | на Windows Ctrl + Z, затем Enter).
 
 ### Пример использования приложения
 ```c++
-> make run ARGS="logs/monday.log WARNING"
-log "check message" WARNING
+> make run
+
+log "warn message" WARNING
+> OK: log with message: "warn message" and level: 1
 log "info message" INFO
-default INFO
+> OK: log with message: "info message" and level: 0
+set-level ERROR
+> OK: level is specified on: 2
 log "info message again" INFO
-silence ERROR
-log error
+> OK: log with message: "info message" and level: 0
+get-level
+> OK: current level is specified on: 0
+get-file
+> OK: current file is specified on: tecslog.log
+get-fallback
+> OK: current fallback is specified on: false
 ```
-Файл `logs/monday.log`:
+
+### Пример выходного файла с логами
 ```
-11.08.2026 16:35:56 [WARNING] check message
-11.08.2026 16:36:44 [INFO] info message again
-11.08.2026 16:36:59 [ERROR] error
+11.08.2026 16:35:56 [WARNING] цфкт message
+11.08.2026 16:36:44 [INFO] info message
 ```
