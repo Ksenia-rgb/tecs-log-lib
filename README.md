@@ -31,43 +31,119 @@ make tests
 ```
 make run
 ```
-Для передачи дополнительных параметров используется переменная ARGS (при помощи GNU Make):
-```
-make run ARGS="logs/monday.log INFO"
-```
-
 - Запуск тестов для библиотеки
 ```
 make test
 ```
 
-## Примеры использования библиотеки
-### Доступные уровни важности сообщений
-- INFO
-- WARNING
-- ERROR
-### Инициализация библиотеки
-Инициализация проводится с помощью команды `init`, имеющей параметры:
-1. Имя файла журнала для записи логов. Если такой файл не может быть открыт для записи, будет установлен файл по умолчанию (`tecslog.log`)
-2. Уровень важности сообщения по умолчанию. Если будет указан некорректный уровень (в случае указания строки), будет установлен минимальный уровень (INFO).
+## Описание работы библиотеки
+### Инициализация
+У библиотеки есть три основных параметра (далее: параметры):
+- Уровень важности: логи с уровнем ниже заданного не будут записаны, есть три возможных уровня логов:
+  - `tecslog::Level::INFO`,
+  - `tecslog::Level::WARNING`,
+  - `tecslog::Level::ERROR`;
+- Файл: логи записываются в установленный файл;
+- Fallback: позволяет пользователю настроить поведение библиотеки для случая, когда установленный файл оказался некорректным:
+  - true (далее: установлен): в случае некорректности установленного пользоватем файла логи будут записаны в файл по умолчанию; если файл по умолчанию тоже не может быть открыт, логи будут потеряны;
+  - false (далее: неустановлен): в случае некорректности установленного пользоватем файла логи будут потеряны.
 
-Инициализация может быть пропущена - будут установлены описанные значения по умолчанию.
+Инициализация библиотеки происходит с помощью функции:
+```c++
+std::error_code code = tecslog::init()
+```
+Для параметров устанавливаются значения по умолчанию. Возвращаемое значение указывает, в корректном ли для дальнейшей работы состоянии находится файл по умолчанию.
+
+Значения параметров по умолчанию можно узнать с помошью функций:
+```c++
+tecslog::Level tecslog::getDefaultLevel(); // tecslog::Level::INFO
+std::string tecslog::getDefaultFile(); // tecslog.log
+bool tecslog::getDefaultFallback(); // 0
+```
+
+Значения текущих параметров можно узнать с помощью функций:
+```c++
+tecslog::Level tecslog::getLevel();
+std::string tecslog::getFile();
+bool tecslog::getFallback();
+```
+
+Возвращаемое значения функции `getFile()` означает файл, куда будут записаны логи:
+- Если пользователь не применял функцию `setFile()` -> имя файла по умолчанию;
+- Если пользователь применял функцию `setFile()` и fallback не установлен -> имя файла пользователя, независимо от его состояния;
+- Если пользователь применял функцию `setFile()` и fallback установлен:
+  - Если файл пользователя в корректном состоянии -> имя файла пользователя,
+  - Если файл пользователя в некорректном состоянии -> имя файла по умолчанию.
+
+### Установка параметров
+Установить новые значения параметров можно с помощью команд:
+```c++
+std::error_code tecslog::setLevel(Level);
+std::error_code tecslog::setLevel(std::string);
+std::error_code tecslog::setFile(std::string);
+std::error_code tecslog::setFallback(bool);
+Возвращаемое значение указывает, корректно ли был установлен параметр.
+```
+- Уровень может установлен с помощью значения `tecslog::Level` или строки, во втором случае строка должна содержать один из уровней:
+  - "INFO", "WARNING", "ERROR";
+  - Для остальных значений будет возвращен ненулевой код ошибки.
+- Файл устанавливается с помощью строки, содержащей имя файла:
+  - Если файл не может быть открыт, будет возвращен ненулевой код ошибки;
+  - Не запрещено передавать имя файла по умолчанию;
+- Fallback устанавливается с помощью булевского значения:
+  - Всегда нулевой код ошибки.
+
+### Команды логирования
+Логирование может выполняться с помощью функций, сразу содержащих в себе уровень:
+```c++
+std::error_code info(std::string);
+std::error_code warning(std::string);
+std::error_code error(std::string);
+```
+Параметры функций: только сообщение лога.
+
+Также логирование может выполняться с помощью функций, требующий указания уровня вручную:
+```c++
+std::error_code log(Level, const std::string);
+std::error_code log(std::string, std::string);
+```
+Параметры функций:
+- Первым параметром указывается уровень лога: с помощью значения `tecslog::Level` или строки (аналогично команде `setLevel()`);
+- Вторым параметром указывается сообщения лога.
+
+Возвращаемое значение - корректно ли прошла запись лога:
+- Ненулевой код возврата если:
+  - Уровень в виде строки указан некорректно;
+  - Файл для записи, установленный пользователем, находится в некорректном состоянии и не установлен параметр fallback (т. е. = false);
+  -  Файл для записи, установленный пользователем, находится в некорректном состоянии, установлен параметр fallback (т. е. = true), но файл по умолчанию так же находится в некорректном состоянии.
+- Нулевой код возврата: во всех остальных случаях, т. е. при удачной записи лога.
+
+Стоит обратить внимание: если вызвана функций логирования с уровнем, меньшим, чем заданный, то лог не будет записан, но это никак не будт отражено в коде возврата, так как это нормальное поведение библиотеки.
+
+## Примеры использования библиотеки
 ### Базовое использование
 ```c++
 #include <tecslog/tecslog.hpp>
 
 int main() 
 {
-  tecslog::init("logs/monday.log", tecslog::Level::INFO);
+  std::error_code code_init = tecslog::init();
+  if (code_init)
+  {
+    std::cerr << code_init.message() << '\n';
+    return 1;
+  }
+  // the following logs will be written to the default file
   tecslog::info("Welcome to tecslog");
   tecslog::warning("Some warning message");
-  tecslog::error("Some error message);
+  tecslog::error("Some error message");
   
-  tecslog::setLevel(tecslog::Level::DEBUG); // Set default log level to debug
-  tecslog::info("This message should be displayed");
+  // set log level to error
+  tecslog::setLevel(tecslog::Level::WARNING);
+  tecslog::info("Info message will not be displayed");
 
-  tecslog::log(tecslog::Level::DEBUG, "Another debug displayed message");
-  tecslog::log(tecslog::Level::ERROR, "Another error displayed message");
+  tecslog::warning(tecslog::Level::WARNING, "Warning displayed message");
+  tecslog::error(tecslog::Level::ERROR, "Error displayed message");
 }
 ```
 
@@ -77,84 +153,126 @@ int main()
 
 int main() 
 {
-  tecslog::init("logs/monday.log", "INFO"); // Set correct str level
+  tecslog::init();
 
   tecslog::log("INFO", "Welcome to tecslog");
-  tecslog::log("WARNING", Some warning message");
-  tecslog::error("ERROR", "Some error message);
+  tecslog::log("WARNING", "Some warning message");
+  tecslog::error("ERROR", "Some error message");
   
-  std::error_code code = tecslog::setLevel("CRITICAL"); // Set incorrect default level and get error_code != 0
+  // set incorrect level and get error_code != 0
+  std::error_code code = tecslog::setLevel("INCORRECT");
   if (code)
   {
     std::cerr << code.message() << '\n'
     return 1;
   }
 
-  code = tecslog::log("WARN", "Incorrect warn message"); // Specify incorrect log level and get error_code != 0
+  // specify incorrect log level and get error_code != 0
+  code = tecslog::log("INCORRECT", "Incorrect warn message");
   if (code)
   {
     std::cerr << code.message() << '\n'
     return 1;
   }
 
-  tecslog::printPossibleLevels(std::cout); // Output: 0 INFO 1 WARNING 2 ERROR
+  // output: 0 INFO 1 WARNING 2 ERROR
+  tecslog::printLevels(std::cout);
 }
 ```
-### Использование без начальной инициализации
+
+### Установка файла и fallback
 ```c++
 #include <tecslog/tecslog.hpp>
 
 int main() 
 {
-  tecslog::info("Hello, everyone"); // Log in default file (tecslog.log) with default level specified as min level (INFO)
+  tecslog::init();
+
+  // let's think, that file "test.log" is correct
+  std::error_code code_file = tecslog::setFile("test.log");
+  
+  std::string file = tecslog::getFile();
+  std::error_code code_info = tecslog::info("Info mess");
+
+  // the following file is most likely incorrect
+  code_file = tecslog::setFile("unreal-dir/imagine-dir/test.log");
+  if (code_file)
+  {
+    // set fallback true, logs will be written in default file
+    tecslog::setFallback(true);
+  }
+
+  // user file is incorrect, but fallback is true - getFile will return default file
+  file = tecslog::getFile();
+  code_info = tecslog::info("Seconf info mess");
 }
 ```
 
-## Использование демонстанционного приложения
-- Запуск демонстрационного приложения с передачей параметров:
-```
-make run ARGS="logs/monday.log INFO"
-```
-### Параметры приложения
-1. Имя файла журнала для записи логов
-2. Уровень важности сообщения по умолчанию
+## Демонстанционное приложение
+Демонстрационное приложение является консольным: ожидает от пользователя ввода определенных команд и их параметров при необходимости со стандартного ввода и возвращает ответ.
 
 ### Пользовательские команды
-Демонстрационное приложение является консольным. Пользователю доступны такие команды:
-- Установка нового уровня важности сообщения по умолчанию. В параметрах указывает *уровень*.
-
-`default <level>`
-
-- Установка уровня важности сообщения, который будет использован, если уровень не был указан в команде log. В параметрах указывается *уровень*.
-
-`silence <level>`
-
-- Запись лога в журнал. Параметры:
-  - *Сообщение*. Если в сообщении есть пробелы, оно должно быть обозначено кавычками (message, "message", "long message")
-  - *Уровень*. Опциональный параметр. Может быть опущен, если до этого была использована команда `silence`, в этом случае сообщение логируется с уровнем, указанным в последней команде `silence`.
-
-`log <message> [level]`
-
-- Вывод вспомогательной информации о командах.
-
-`help`
+Пользователю доступны такие команды:
+- Получение текущего значения уровня:
+```
+get-level
+```
+- Получение текущего значения файла:
+```
+get-file
+```
+- Получение текущего значения fallback:
+```
+get-fallback
+```
+- Установка нового значения уровня, в параметрах указывается *уровень*:
+```
+set-level <level>
+```
+- Установка нового значения файла, в параметрах указывается *файл*:
+```
+set-file <file>
+```
+- Установка нового значения fallback, в параметрах указывается *fallback*:
+```
+set-fallback <fallback>
+```
+- Запись лога в журнал, параметры:
+  - *сообщение* (если в сообщении есть пробелы, оно должно быть обозначено кавычками (message, "message", "long message")),
+  - *уровень*;
+```
+log <message> <level>
+```
+- Вывод вспомогательной информации о командах:
+```
+help
+```
 
 
 Признаком конца пользовательского ввода является EOF (на Linux: Ctrl + D | на Windows Ctrl + Z, затем Enter).
 
 ### Пример использования приложения
 ```c++
-> make run ARGS="logs/monday.log WARNING"
-log "check message" WARNING
+> make run
+
+log "warn message" WARNING
+> OK: log with message: "warn message" and level: 1
 log "info message" INFO
-default INFO
+> OK: log with message: "info message" and level: 0
+set-level ERROR
+> OK: level is specified on: 2
 log "info message again" INFO
-silence ERROR
-log error
+> OK: log with message: "info message" and level: 0
+get-level
+> OK: current level is specified on: 0
+get-file
+> OK: current file is specified on: tecslog.log
+get-fallback
+> OK: current fallback is specified on: false
 ```
-Файл `logs/monday.log`:
+
+### Пример выходного файла с логами
 ```
-11.08.2026 16:35:56 [WARNING] check message
-11.08.2026 16:36:44 [INFO] info message again
-11.08.2026 16:36:59 [ERROR] error
+11.08.2026 16:35:56 [WARNING] цфкт message
+11.08.2026 16:36:44 [INFO] info message
 ```
