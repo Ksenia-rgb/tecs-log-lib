@@ -9,15 +9,23 @@
 
 namespace tecslog
 {
-  std::error_code init(const std::string& filename, Level level);
-  std::error_code init(const std::string& filename, const std::string& level);
+  std::error_code init();
+
+  Level getLevel();
+  std::string getFile();
+  bool getFallback();
+
+  Level getDefaultLevel();
+  std::string getDefaultFile();
+  bool getDefaultFallback();
+
+  std::ostream& printLevels(std::ostream& out);
 
   std::error_code setLevel(Level level);
   std::error_code setLevel(const std::string& level);
-  std::ostream& printPossibleLevels(std::ostream& out);
-  std::optional< Level > parseLevel(const std::string& str_level);
-  Level getDefaultLevel();
-  std::string getLogFile();
+  std::error_code setFile(const std::string& filename);
+  std::error_code setFallback(bool fallback);
+
   void reset();
 
   std::error_code info(const std::string& message);

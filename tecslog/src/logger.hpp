@@ -2,26 +2,38 @@
 #define LOGGER_HPP
 
 #include <fstream>
-#include <mutex>
 #include <optional>
 #include <string>
-#include <unordered_map>
+#include <vector>
+#include <atomic>
 
 #include <tecslog/types.hpp>
+#include "file-writer.hpp"
 
 namespace tecslog
 {
+  namespace detail
+  {
+    static const std::vector< std::string > str_level = {"INFO", "WARNING", "ERROR"};
+    std::string levelToStr(Level level);
+    std::optional< Level > strToLevel(const std::string& level);
+  }
   class Logger
   {
   public:
     static Logger& instance();
 
+    Level getLevel();
+    std::string getFile();
+    bool getFallback();
+    std::error_code getState();
+    std::ostream& printLevels(std::ostream& out);
+
     std::error_code setFile(const std::string& filename);
-    bool isFileOpen();
     std::error_code setLevel(Level level);
     std::error_code setLevel(const std::string& str_level);
-    Level getDefaultLevel();
-    std::string getLogFile();
+    std::error_code setFallback(bool fallback);
+
     void reset();
 
     std::error_code info(const std::string& message);
@@ -30,29 +42,15 @@ namespace tecslog
     std::error_code log(Level level, const std::string& message);
     std::error_code log(const std::string& str_level, const std::string& message);
 
-    static std::string levelToStr(Level level);
-    static std::optional< Level > strToLevel(const std::string& level);
   private:
-    static const std::string default_filename_;
-    static const Level default_level_;
-    static const std::unordered_map< tecslog::Level, std::string > level_map;
-    static const std::unordered_map< std::string, tecslog::Level > str_level_map;
-
-    std::string config_filename_;
-    std::string open_filename_;
-    Level level_;
-    std::ofstream out_;
-
-    std::mutex mutex_level;
-    std::mutex mutex_file;
+    detail::LogWriter writer_;
+    std::atomic< Level > level_;
 
     Logger();
-    ~Logger();
     Logger(const Logger&) = delete;
     Logger& operator=(const Logger&) = delete;
 
-    std::error_code uncheckLevelLog(const std::string& str_level, const std::string& message);
-    std::error_code ensureFileOpen();
+    std::error_code sendLog(const std::string& str_level, const std::string& message);
   };
 }
 
